@@ -1,4 +1,28 @@
-import polymod.Polymod;
+/**
+ * Copyright (c) 2018 Level Up Labs, LLC
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ * 
+ */
+
+package;
+
 import lime.utils.Assets;
 import openfl.Assets;
 import openfl.display.DisplayObject;
@@ -9,18 +33,20 @@ import openfl.display.Sprite;
 import openfl.text.TextField;
 import openfl.text.TextFormatAlign;
 import openfl.utils.AssetType;
+import sys.FileSystem;
 
+/**
+ * ...
+ * @author 
+ */
 class Demo extends Sprite
 {
 	private var widgets:Array<ModWidget> = [];
 	private var callback:Array<String>->Void;
 	private var stuff:Array<Dynamic> = [];
 	private var limeToggle:CheapButton;
-	private var depToggle:CheapButton;
 
 	public static var usingOpenFL(default, null):Bool = true;
-
-	public static var skipDependencyErrors(default, null):Bool = false;
 
 	public function new(callback:Array<String>->Void)
 	{
@@ -56,19 +82,17 @@ class Demo extends Sprite
 
 	private function makeButtons()
 	{
-		// Using configuration provided by Polymod.init.
-		var modList:Array<ModMetadata> = Polymod.scan();
-		// Sort the list by id.
-		modList.sort(function(a, b):Int
-		{
-			return a.id < b.id ? -1 : 1;
-		});
-
+		var modDir:String = "../../../mods";
+		#if mac
+		// account for <APPLICATION>.app/Contents/Resources
+		modDir = "../../../../../../mods";
+		#end
+		var mods = FileSystem.readDirectory(modDir);
 		var xx = 10;
 		var yy = 200;
-		for (mod in modList)
+		for (mod in mods)
 		{
-			var w = new ModWidget(mod.id, onWidgetMove);
+			var w = new ModWidget(mod, onWidgetMove);
 			w.x = xx;
 			w.y = yy;
 
@@ -93,26 +117,14 @@ class Demo extends Sprite
 		var limeLabel = getText(LEFT);
 		limeLabel.x = 10;
 		limeLabel.y = 400;
-		limeLabel.text = 'Asset System:';
+		limeLabel.text = "Asset System:";
 
-		limeToggle = new CheapButton(usingOpenFL ? 'openfl' : 'lime', onToggleOpenFL);
+		limeToggle = new CheapButton(usingOpenFL ? "openfl" : "lime", onToggleOpenFL);
 		limeToggle.x = 10;
 		limeToggle.y = 420;
 
 		addChild(limeLabel);
 		addChild(limeToggle);
-
-		var depLabel = getText(LEFT);
-		depLabel.x = 210;
-		depLabel.y = 400;
-		depLabel.text = 'Dep. Errors:';
-
-		depToggle = new CheapButton(skipDependencyErrors ? 'skip' : 'error', onToggleSkipDependencyErrors);
-		depToggle.x = 210;
-		depToggle.y = 420;
-
-		addChild(depLabel);
-		addChild(depToggle);
 	}
 
 	private function onToggleOpenFL()
@@ -121,32 +133,11 @@ class Demo extends Sprite
 
 		if (usingOpenFL)
 		{
-			limeToggle.setText('openfl');
+			limeToggle.setText("openfl");
 		}
 		else
 		{
-			limeToggle.setText('lime');
-		}
-
-		reloadMods();
-		visible = false;
-		haxe.Timer.delay(function()
-		{
-			visible = true;
-		}, 10);
-	}
-
-	private function onToggleSkipDependencyErrors()
-	{
-		skipDependencyErrors = !skipDependencyErrors;
-
-		if (skipDependencyErrors)
-		{
-			depToggle.setText('skip');
-		}
-		else
-		{
-			depToggle.setText('error');
+			limeToggle.setText("lime");
 		}
 
 		reloadMods();
@@ -302,7 +293,7 @@ class Demo extends Sprite
 		{
 			var isXML:Bool = false;
 			var align = TextFormatAlign.CENTER;
-			if (t.indexOf('xml') != -1 || t.indexOf('json') != -1)
+			if (t.indexOf("xml") != -1 || t.indexOf("json") != -1)
 			{
 				isXML = true;
 				align = TextFormatAlign.LEFT;
@@ -318,7 +309,7 @@ class Demo extends Sprite
 			text.multiline = true;
 
 			var str = AssetsGetText(t);
-			text.text = (str != null ? str : 'null');
+			text.text = (str != null ? str : "null");
 
 			var caption = getText();
 			caption.x = xx;

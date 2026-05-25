@@ -1,18 +1,34 @@
+/**
+ * Copyright (c) 2018 Level Up Labs, LLC
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ * 
+ */
+
 package polymod.backends;
 
+import polymod.fs.IFileSystem;
 import haxe.io.Bytes;
-import openfl.display3D.IndexBuffer3D;
+import polymod.util.Util;
 import polymod.backends.IBackend;
 import polymod.backends.PolymodAssets.PolymodAssetType;
 import polymod.format.ParseRules;
-import polymod.fs.PolymodFileSystem.IFileSystem;
-// import polymod.hscript.PolymodScriptClass;
-import polymod.util.Util;
-#if firetongue
-import firetongue.FireTongue;
-#end
-
-using StringTools;
 
 typedef PolymodAssetLibraryParams =
 {
@@ -23,7 +39,7 @@ typedef PolymodAssetLibraryParams =
 
 	/**
 	 * paths to each mod's root directories.
-	 * This takes precedence over the 'Dir' parameter and the order matters -- mod files will load from first to last, with last taking precedence
+	 * This takes precedence over the "Dir" parameter and the order matters -- mod files will load from first to last, with last taking precedence
 	 */
 	dirs:Array<String>,
 
@@ -43,19 +59,7 @@ typedef PolymodAssetLibraryParams =
 	/**
 	 * (optional) maps file extensions to asset types. This ensures e.g. text files with unfamiliar extensions are handled properly.
 	 */
-	?extensionMap:Map<String, PolymodAssetType>,
-	/**
-	 * (optional) if your assets folder is not named `assets/`, you can specify the proper name here
-	 * This prevents some bugs when calling `Assets.list()`, among other things.
-	 */
-	?assetPrefix:String,
-
-	/**
-	 * (optional) a FireTongue instance for Polymod to hook into for localization support
-	 */
-	#if firetongue
-	?firetongue:FireTongue,
-	#end
+	?extensionMap:Map<String, PolymodAssetType>
 }
 
 class PolymodAssetLibrary
@@ -64,9 +68,7 @@ class PolymodAssetLibrary
 	public var fileSystem(default, null):IFileSystem;
 
 	public var type(default, null):Map<String, PolymodAssetType>;
-	public var typeLibraries(default, null):Map<String, Array<String>>;
 
-	public var assetPrefix(default, null):String = "assets/";
 	public var dirs:Array<String> = null;
 	public var ignoredFiles:Array<String> = null;
 
@@ -82,57 +84,9 @@ class PolymodAssetLibrary
 		parseRules = params.parseRules;
 		ignoredFiles = params.ignoredFiles != null ? params.ignoredFiles.copy() : [];
 		extensions = params.extensionMap;
-		if (params.assetPrefix != null)
-			assetPrefix = params.assetPrefix;
-
-		#if firetongue
-		tongue = params.firetongue;
-		if (tongue != null)
-		{
-			// Call when we build the asset library then again each time we change locale.
-			onFireTongueLoad();
-			tongue.addFinishedCallback(onFireTongueLoad);
-		}
-		#end
-
 		backend.clearCache();
 		init();
 	}
-
-	#if firetongue
-	private var tongue:FireTongue = null;
-
-	/**
-	 * The directory where all the FireTongue locales are stored.
-	 */
-	public var rawTongueDirectory(default, null):String = null;
-
-	/**
-	 * The directory where the current locale's FireTongue files are stored.
-	 */
-	public var localePrefix(default, null):String = null;
-
-	/**
-	 * The directory where the current locale's FireTongue localized assets are stored.
-	 *
-	 * Prefix asset paths with this string to get a localized version of the asset.
-	 */
-	public var localeAssetPrefix(default, null):String = null;
-
-	/**
-	 * Do basic initialization based on the FireTongue instance
-	 * Must be redone if the locale changes
-	 */
-	function onFireTongueLoad()
-	{
-		if (tongue == null)
-			return;
-
-		rawTongueDirectory = tongue.directory;
-		localePrefix = Util.pathJoin(rawTongueDirectory, tongue.locale);
-		localeAssetPrefix = Util.pathJoin(localePrefix, assetPrefix);
-	}
-	#end
 
 	public function destroy()
 	{
@@ -140,7 +94,6 @@ class PolymodAssetLibrary
 		{
 			backend.destroy();
 		}
-		Polymod.clearScripts();
 	}
 
 	public function mergeAndAppendText(id:String, modText:String):String
@@ -163,7 +116,7 @@ class PolymodAssetLibrary
 	 * @param	theDir
 	 * @return
 	 */
-	public function getTextDirectly(id:String, directory:String = ''):String
+	public function getTextDirectly(id:String, directory:String = ""):String
 	{
 		var bytes = null;
 		if (checkDirectly(id, directory))
@@ -196,33 +149,14 @@ class PolymodAssetLibrary
 		return backend.getText(id);
 	}
 
-	#if lime
-	public function loadText(id:String):lime.app.Future<String>
-	{
-		return backend.loadText(id);
-	}
-	#end
-
 	public function getBytes(id:String):Bytes
 	{
 		return backend.getBytes(id);
 	}
 
-	#if lime
-	public function loadBytes(id:String):lime.app.Future<Bytes>
-	{
-		return backend.loadBytes(id);
-	}
-	#end
-
 	public function getPath(id:String):String
 	{
 		return backend.getPath(id);
-	}
-
-	public function clearCache()
-	{
-		backend.clearCache();
 	}
 
 	public function list(type:PolymodAssetType = null):Array<String>
@@ -236,9 +170,7 @@ class PolymodAssetLibrary
 
 		for (id in this.type.keys())
 		{
-			if (items.indexOf(id) != -1)
-				continue;
-			if (id.indexOf('_append') == 0 || id.indexOf('_merge') == 0)
+			if (id.indexOf("_append") == 0 || id.indexOf("_merge") == 0)
 				continue;
 			if (type == null || type == BYTES || check(id, type))
 			{
@@ -261,7 +193,7 @@ class PolymodAssetLibrary
 		if (exists && type != null && type != PolymodAssetType.BYTES)
 		{
 			var otherType = this.type.get(id);
-			exists = (otherType == type || otherType == PolymodAssetType.BYTES || otherType == null || otherType == '');
+			exists = (otherType == type || otherType == PolymodAssetType.BYTES || otherType == null || otherType == "");
 		}
 		return exists;
 	}
@@ -276,10 +208,10 @@ class PolymodAssetLibrary
 		return null;
 	}
 
-	public function checkDirectly(id:String, dir:String = ''):Bool
+	public function checkDirectly(id:String, dir:String):Bool
 	{
-		id = stripAssetsPrefix(id);
-		if (dir == null || dir == '')
+		id = backend.stripAssetsPrefix(id);
+		if (dir == null || dir == "")
 		{
 			return fileSystem.exists(id);
 		}
@@ -300,96 +232,45 @@ class PolymodAssetLibrary
 	 * @param	id
 	 * @return
 	 */
-	public function file(id:String, theDir:String = ''):String
+	public function file(id:String, theDir:String = ""):String
 	{
-		var idStripped = stripAssetsPrefix(id);
-		if (theDir != '')
+		id = backend.stripAssetsPrefix(id);
+		if (theDir != "")
 		{
-			if (idStripped.startsWith(theDir)) return idStripped;
-			return Util.pathJoin(theDir, idStripped);
+			return Util.pathJoin(theDir, id);
 		}
 
-		var result = '';
-		var resultLocalized = false;
-		for (modDir in dirs)
+		var theFile = "";
+		for (d in dirs)
 		{
-			#if firetongue
-			if (localeAssetPrefix != null)
+			var thePath = Util.pathJoin(d, id);
+			if (fileSystem.exists(thePath))
 			{
-				var localePath = Util.pathJoin(modDir, Util.pathJoin(localeAssetPrefix, idStripped));
-				if (fileSystem.exists(localePath))
-				{
-					result = localePath;
-					resultLocalized = true;
-				}
-			}
-			// Else, FireTongue not enabled.
-			#end
-
-			if (resultLocalized) continue;
-
-			if (!resultLocalized)
-			{
-				// If we have an asset prefix
-
-				var filePath = Util.pathJoin(modDir, idStripped);
-				if (fileSystem.exists(filePath))
-					result = filePath;
+				theFile = thePath;
 			}
 		}
-		return result;
-	}
-
-	/**
-	 * Get the filename of the given asset id,
-	 * with the given locale prefix prepended.
-	 * (will ignore all installed mods)
-	 */
-	public function fileLocale(id:String):String
-	{
-		#if firetongue
-		if (localeAssetPrefix != null)
-		{
-			var idStripped = stripAssetsPrefix(id);
-			return Util.pathJoin(localeAssetPrefix, idStripped);
-		}
-		// Else, Firetongue is not enabled.
-		#end
-		// Else, Firetongue is not installed.
-		return null;
+		return theFile;
 	}
 
 	private function _checkExists(id:String):Bool
 	{
 		if (ignoredFiles.length > 0 && ignoredFiles.indexOf(id) != -1)
 			return false;
-		id = stripAssetsPrefix(id);
+		var exists = false;
+		id = backend.stripAssetsPrefix(id);
 		for (d in dirs)
 		{
-			#if firetongue
-			if (localeAssetPrefix != null)
+			if (fileSystem.exists(Util.pathJoin(d, id)))
 			{
-				var localePath = Util.pathJoin(d, Util.pathJoin(localeAssetPrefix, id));
-				if (fileSystem.exists(localePath))
-					return true;
-			}
-			// Else, FireTongue not enabled.
-			#end
-
-			var filePath = Util.pathJoin(d, id);
-			if (fileSystem.exists(filePath))
-			{
-				return true;
+				exists = true;
 			}
 		}
-		// The loop didn't find it.
-		return false;
+		return exists;
 	}
 
 	private function init()
 	{
-		type = [];
-		typeLibraries = [ 'default' => [] ];
+		type = new Map<String, PolymodAssetType>();
 		initExtensions();
 		if (parseRules == null)
 			parseRules = ParseRules.getDefault();
@@ -404,43 +285,33 @@ class PolymodAssetLibrary
 
 	private function initExtensions()
 	{
-		if (extensions == null)
-			extensions = new Map<String, PolymodAssetType>();
-
-		_extensionSet('mp3', AUDIO_SOUND);
-		_extensionSet('ogg', AUDIO_SOUND);
-		_extensionSet('wav', AUDIO_SOUND);
-
-		_extensionSet('otf', FONT);
-		_extensionSet('ttf', FONT);
-
-		_extensionSet('bmp', IMAGE);
-		_extensionSet('gif', IMAGE);
-		_extensionSet('jpg', IMAGE);
-		_extensionSet('png', IMAGE);
-		_extensionSet('tga', IMAGE);
-		_extensionSet('tif', IMAGE);
-		_extensionSet('tiff', IMAGE);
-
-		_extensionSet('csv', TEXT);
-		_extensionSet('hx', TEXT);
-		_extensionSet('hxc', TEXT);
-		_extensionSet('hxs', TEXT);
-		_extensionSet('json', TEXT);
-		_extensionSet('md', TEXT);
-		_extensionSet('mpf', TEXT);
-		_extensionSet('tmx', TEXT);
-		_extensionSet('tsv', TEXT);
-		_extensionSet('tsx', TEXT);
-		_extensionSet('txt', TEXT);
-		_extensionSet('vdf', TEXT);
-		_extensionSet('xml', TEXT);
-
-		_extensionSet('avi', VIDEO);
-		_extensionSet('mkv', VIDEO);
-		_extensionSet('mov', VIDEO);
-		_extensionSet('mp4', VIDEO);
-		_extensionSet('webm', VIDEO);
+		extensions = new Map<String, PolymodAssetType>();
+		_extensionSet("mp3", AUDIO_GENERIC);
+		_extensionSet("ogg", AUDIO_GENERIC);
+		_extensionSet("wav", AUDIO_GENERIC);
+		_extensionSet("jpg", IMAGE);
+		_extensionSet("png", IMAGE);
+		_extensionSet("gif", IMAGE);
+		_extensionSet("tga", IMAGE);
+		_extensionSet("bmp", IMAGE);
+		_extensionSet("tif", IMAGE);
+		_extensionSet("tiff", IMAGE);
+		_extensionSet("txt", TEXT);
+		_extensionSet("xml", TEXT);
+		_extensionSet("json", TEXT);
+		_extensionSet("csv", TEXT);
+		_extensionSet("tsv", TEXT);
+		_extensionSet("mpf", TEXT);
+		_extensionSet("tsx", TEXT);
+		_extensionSet("tmx", TEXT);
+		_extensionSet("vdf", TEXT);
+		_extensionSet("ttf", FONT);
+		_extensionSet("otf", FONT);
+        _extensionSet("webm", VIDEO);
+        _extensionSet("mp4", VIDEO);
+        _extensionSet("mov", VIDEO);
+        _extensionSet("avi", VIDEO);
+        _extensionSet("mkv", VIDEO);
 	}
 
 	private function _extensionSet(str:String, type:PolymodAssetType)
@@ -453,13 +324,16 @@ class PolymodAssetLibrary
 
 	private function initMod(d:String):Void
 	{
-		Polymod.notice(MOD_LOAD_PREPARE, 'Preparing to load mod $d');
+        Polymod.error(MOD_LOAD_PREPARE, 'Preparing to load mod $d');
 		if (d == null)
 			return;
 
 		var all:Array<String> = null;
 
-		if (d == '') all = [];
+		if (d == "" || d == null)
+		{
+			all = [];
+		}
 
 		try
 		{
@@ -467,110 +341,24 @@ class PolymodAssetLibrary
 			{
 				all = fileSystem.readDirectoryRecursive(d);
 			}
+			else
+			{
+				all = [];
+			}
 		}
 		catch (msg:Dynamic)
 		{
-			Polymod.error(MOD_LOAD_FAILED, 'Failed to load mod $d : $msg');
-			throw('ModAssetLibrary._initMod("$d") failed: $msg');
+            Polymod.error(MOD_LOAD_FAILED, 'Failed to load mod $d : $msg');
+			throw("ModAssetLibrary._initMod(" + d + ") failed : " + msg);
 		}
 		for (f in all)
 		{
-			var doti = Util.uLastIndexOf(f, '.');
-			var ext:String = doti != -1 ? f.substring(doti + 1) : '';
+			var doti = Util.uLastIndexOf(f, ".");
+			var ext:String = doti != -1 ? f.substring(doti + 1) : "";
 			ext = ext.toLowerCase();
 			var assetType = getExtensionType(ext);
 			type.set(f, assetType);
-			// TODO: What about other asset libraries?
-			typeLibraries.get('default').push(f);
-			#if openfl
-			if (assetType == FONT)
-			{
-				var font = openfl.text.Font.fromBytes(fileSystem.getFileBytes(file(f, d)));
-				@:privateAccess if (!openfl.text.Font.__fontByName.exists(font.name))
-					openfl.text.Font.registerFont(font);
-			}
-			#end
 		}
-		Polymod.notice(MOD_LOAD_DONE, 'Done loading mod $d');
-	}
-
-	@:allow(polymod.backends.LimeCoreLibrary)
-	private function initRedirectPath(libraryId:String, redirectPath:String, pathPrefix:String = '') {
-		if (redirectPath == null || redirectPath == '') return;
-
-		redirectPath = Util.pathJoin(redirectPath, pathPrefix);
-
-		var all:Array<String> = [];
-
-		try {
-			if (fileSystem.exists(redirectPath))
-			{
-				all = fileSystem.readDirectoryRecursive(redirectPath);
-			} else {
-				Polymod.error(MOD_LOAD_FAILED, 'Failed to load core asset redirect $redirectPath : Directory does not exist!');
-				throw('ModAssetLibrary.initRedirectPath("$redirectPath") failed: Directory does not exist!');
-			}
-		}
-		catch (msg:Dynamic)
-		{
-			Polymod.error(MOD_LOAD_FAILED, 'Failed to load core asset redirect $redirectPath : $msg');
-			throw('ModAssetLibrary.initRedirectPath("$redirectPath") failed: $msg');
-		}
-
-		if (!typeLibraries.exists(libraryId)) {
-			typeLibraries.set(libraryId, []);
-		}
-
-		for (f in all) {
-			var doti = Util.uLastIndexOf(f, '.');
-			var ext:String = doti != -1 ? f.substring(doti + 1) : '';
-			ext = ext.toLowerCase();
-			var assetType = getExtensionType(ext);
-			type.set(f, assetType);
-			if (!typeLibraries.exists(libraryId)) typeLibraries.set(libraryId, []);
-			typeLibraries.get(libraryId).push(f);
-			#if openfl
-			if (assetType == FONT)
-			{
-				var font = openfl.text.Font.fromBytes(fileSystem.getFileBytes(file(f, redirectPath)));
-				@:privateAccess if (!openfl.text.Font.__fontByName.exists(font.name))
-					openfl.text.Font.registerFont(font);
-			}
-			#end
-		}
-		var keyCount = typeLibraries.get(libraryId).length;
-		Polymod.notice(MOD_LOAD_DONE, 'Done loading core asset redirect $redirectPath ($keyCount keys)');
-	}
-
-	/**
-	 * Strip the `assets/` prefix from a file path, if it is present.
-	 * If your app uses a different asset path prefix, you can override this with the `assetPrefix` parameter.
-	 *
-	 * @param id The path to strip.
-	 * @return The modified path
-	 */
-	public function stripAssetsPrefix(id:String):String
-	{
-		if (Util.uIndexOf(id, assetPrefix) == 0)
-		{
-			id = Util.uSubstring(id, assetPrefix.length);
-		}
-		return id;
-	}
-
-	/**
-	 * Add the `assets/` prefix to a file path, if it isn't present.
-	 * If your app uses a different asset path prefix, you can override this with the `assetPrefix` parameter.
-	 *
-	 * @param id The path to prepend
-	 * @return The modified path
-	 */
-	public function prependAssetsPrefix(id:String):String
-	{
-		if (Util.uIndexOf(id, assetPrefix) == 0)
-		{
-			return id;
-		}
-		return '$assetPrefix$id';
+        Polymod.error(MOD_LOAD_DONE, 'Done loading mod $d');
 	}
 }
